@@ -4,14 +4,14 @@ use std::io::{self, BufRead, BufReader, Lines};
 use std::path::Path;
 
 fn main() {
-    let input: Vec<i32> = match read_input("input") {
+    let input_data: Vec<i32> = match read_input("input") {
         Err(err) => {
             println!("Error reading day 1 input: {}", err.to_string());
             return;
         }
         Ok(parsed_input) => parsed_input,
     };
-    let (part1, part2) = calculate_answers(input);
+    let (part1, part2) = calculate_answers(input_data);
     println!("\tDay 1\nPart 1: {}\nPart 2: {}", part1, part2);
 }
 fn calculate_answers(moves: Vec<i32>) -> (i32, i32) {
@@ -20,21 +20,21 @@ fn calculate_answers(moves: Vec<i32>) -> (i32, i32) {
     let mut part2: i32 = 0;
     let mut dial_position: i32 = 50;
 
-    for diff in moves.into_iter() {
-        // Move dial_position to 50 (without passing a 0, in general case) and calculate the new diff
-        dial_position += diff;
+    for dial_move in moves.into_iter() {
+        dial_position += dial_move;
 
-        // As this normalised_diff is centred at 50, its easy to work out how many 0s are crossed
-        let normalised_diff = (diff + 50 - dial_position.rem_euclid(100)).abs();
-        part2 += (normalised_diff + 49) / 100;
+        // Move dial_position to 50 (without passing a 0, in general case) and calculate the new dial_move
+        // As this normalised_move is centred at 50, its easy to work out how many 0s are crossed
+        let normalised_move = (dial_move + 50 - dial_position.rem_euclid(100)).abs();
+        part2 += (normalised_move + 49) / 100;
 
         if dial_position % 100 == 0 {
             part1 += 1;
-            // Theres an edge case that occurs if diff > 0 (then prev_dial_pos < dial_pos) and
-            // dial pos % 100 == 0. Moving dial to 50 adds an extra crossing of 0. So we check
-            // if this edge case has occurred before incrementing here.
-            if diff < 0 {
-                part2 += 1;
+            part2 += 1;
+            // If the dial is at 0, it moves right to 50. If the original position was to the left then
+            // this adds an extra crossing of 0. to account for this, subtract 1 if the dial turned right
+            if dial_move > 0 {
+                part2 -= 1;
             }
         }
     }
