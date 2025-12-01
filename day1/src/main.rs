@@ -1,6 +1,7 @@
+use shared;
 use std::error::Error;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Lines};
+use std::io::{BufReader, Lines};
 use std::path::Path;
 
 fn main() {
@@ -45,7 +46,7 @@ fn read_input<P>(filename: P) -> Result<Vec<i32>, Box<dyn Error>>
 where
     P: AsRef<Path>,
 {
-    Ok(parse_lines(get_lines_from_file(filename)?)?)
+    Ok(parse_lines(shared::get_lines_from_file(filename)?)?)
 }
 fn parse_lines(lines: Lines<BufReader<File>>) -> Result<Vec<i32>, Box<dyn Error>> {
     let mut result: Vec<i32> = Vec::new();
@@ -69,13 +70,6 @@ fn parse_lines(lines: Lines<BufReader<File>>) -> Result<Vec<i32>, Box<dyn Error>
         }
     }
     Ok(result)
-}
-fn get_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename.as_ref())?;
-    Ok(io::BufReader::new(file).lines())
 }
 
 #[cfg(test)]
