@@ -18,43 +18,66 @@ fn calculate_answers(intervals: Vec<(Int, Int)>) -> (Int, Int) {
     let primes = vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
     let mut part1 = 0;
     let mut part2 = 0;
-    for (low, high) in intervals {
-        let mut seed = low;
-        for target_digits in digit_count(low)..digit_count(high) + 1 {
-            let mut is_first_num_splits = true;
-            for &num_repeats in primes.iter().take_while(|x| **x <= target_digits) {
-                if target_digits % (num_repeats) != 0 {
+
+    for (lower_bound, upper_bound) in intervals {
+        let mut first_sequence_seed = lower_bound;
+        for target_digit_count in digit_count(lower_bound)..digit_count(upper_bound) + 1 {
+            let mut first_iteration = true;
+            for &num_repetitions in primes.iter().take_while(|x| **x <= target_digit_count) {
+                if target_digit_count % (num_repetitions) != 0 {
                     continue;
                 }
-                let sequence_digits = target_digits / num_repeats;
-                let sequence_max = pow10(sequence_digits);
-                let mut sequence = seed / pow10(target_digits - sequence_digits);
-
-                if repeat_num(sequence, num_repeats) < low {
-                    sequence += 1;
-                };
-                let danger_val = get_danger_val(sequence_digits);
-                let mut repeated = repeat_num(sequence, num_repeats);
-                while sequence < sequence_max && repeated <= high {
-                    // If spltting with primes, the only case that can be double counted are multiples of 1, 11, 111... etc.
-                    // But we do want these values counted once, so check if this is the first
-                    if sequence % danger_val != 0 || is_first_num_splits {
-                        part2 += repeated;
-                    }
-                    if num_repeats == 2 {
-                        part1 += repeated;
-                    }
-                    sequence += 1;
-                    repeated = repeat_num(sequence, num_repeats);
+                let invalid_id_sum = find_n_digit_repeats(
+                    target_digit_count,
+                    num_repetitions,
+                    first_sequence_seed,
+                    (lower_bound, upper_bound),
+                    first_iteration,
+                );
+                part2 += invalid_id_sum;
+                if num_repetitions == 2 {
+                    part1 += invalid_id_sum;
                 }
-                is_first_num_splits = false;
+                first_iteration = false;
             }
-            seed = pow10(target_digits);
+            first_sequence_seed = power_of_ten(target_digit_count);
         }
     }
 
     (part1, part2)
 }
+
+fn find_n_digit_repeats(
+    target_digit_count: u32,
+    num_repetitions: u32,
+    first_sequence_seed: Int,
+    (lower_bound, upper_bound): (Int, Int),
+    first_iteration: bool,
+) -> Int {
+    let mut invalid_id_sum = 0;
+
+    let sequence_digit_count = target_digit_count / num_repetitions;
+    let sequence_max = power_of_ten(sequence_digit_count);
+    let potential_duplicate_factor = get_duplicate_factor(sequence_digit_count);
+
+    let mut sequence = first_sequence_seed / power_of_ten(target_digit_count - sequence_digit_count);
+    if repeat_num(sequence, num_repetitions) < lower_bound {
+        //First repetition was less than LB, increase by 1 so it's greater than LB
+        sequence += 1;
+    };
+    let mut repeated_sequence = repeat_num(sequence, num_repetitions);
+    while sequence < sequence_max && repeated_sequence <= upper_bound {
+        // If spltting with primes, the only case that can be double counted are multiples of 1, 11, 111... etc.
+        // But we do want these values counted once, so check if this is the first
+        if sequence % potential_duplicate_factor != 0 || first_iteration {
+            invalid_id_sum += repeated_sequence;
+        }
+        sequence += 1;
+        repeated_sequence = repeat_num(sequence, num_repetitions);
+    }
+    invalid_id_sum
+}
+
 fn digit_count(x: Int) -> u32 {
     let mut log = 0;
     let mut mult = 1;
@@ -64,24 +87,13 @@ fn digit_count(x: Int) -> u32 {
     }
     log
 }
-fn pow10(x: u32) -> Int {
-    let ten: Int = 10;
-    ten.pow(x)
-}
-fn get_danger_val(num_digits: u32) -> Int {
-    let mut result = 0;
-    for d in 0..num_digits {
-        result += pow10(d);
-    }
-    result
-}
+fn power_of_ten(x: u32) -> Int { Int::pow(10, x) }
+fn get_duplicate_factor(num_digits: u32) -> Int { (0..num_digits).map(power_of_ten).sum() }
 fn repeat_num(num: Int, num_times: u32) -> Int {
     let digits = digit_count(num);
-    let mut repeated = 0;
-    for i in 0..num_times {
-        repeated += num * pow10(digits * i);
-    }
-    repeated
+    (0..num_times)
+        .map(|repetition| num * power_of_ten(digits * repetition))
+        .sum()
 }
 
 fn read_input<P>(filename: P) -> Result<Vec<(Int, Int)>, Box<dyn Error>>
@@ -145,11 +157,14 @@ mod tests {
     }
     #[test]
     fn test_digit_count() {
+        assert_eq!(digit_count(1), 1);
+        assert_eq!(digit_count(9), 1);
         assert_eq!(digit_count(10), 2);
         assert_eq!(digit_count(99), 2);
         assert_eq!(digit_count(100), 3);
         assert_eq!(digit_count(999), 3);
         assert_eq!(digit_count(1000), 4);
+        assert_eq!(digit_count(5000), 4);
         assert_eq!(digit_count(9999), 4);
     }
     #[test]
