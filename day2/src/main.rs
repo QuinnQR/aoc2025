@@ -20,25 +20,27 @@ fn calculate_answers(intervals: Vec<(Int, Int)>) -> (Int, Int) {
     let mut part2 = 0;
 
     for (lower_bound, upper_bound) in intervals {
+        // Used to seed first valid repeatable sequence s.t. rep(sequence) >= LB   - changes if more digits are added
         let mut first_sequence_seed = lower_bound;
         for target_digit_count in digit_count(lower_bound)..digit_count(upper_bound) + 1 {
-            let mut first_iteration = true;
-            for &num_repetitions in primes.iter().take_while(|x| **x <= target_digit_count) {
-                if target_digit_count % (num_repetitions) != 0 {
+            // Used to stop duplicate values being added multiple times
+            let mut is_first_iteration = true;
+            for &repetitions in primes.iter().take_while(|x| **x <= target_digit_count) {
+                if target_digit_count % (repetitions) != 0 {
                     continue;
                 }
-                let invalid_id_sum = find_n_digit_repeats(
+                let invalid_id_sum = find_n_digit_repeats_in_interval(
                     target_digit_count,
-                    num_repetitions,
+                    repetitions,
                     first_sequence_seed,
                     (lower_bound, upper_bound),
-                    first_iteration,
+                    is_first_iteration,
                 );
                 part2 += invalid_id_sum;
-                if num_repetitions == 2 {
+                if repetitions == 2 {
                     part1 += invalid_id_sum;
                 }
-                first_iteration = false;
+                is_first_iteration = false;
             }
             first_sequence_seed = power_of_ten(target_digit_count);
         }
@@ -47,33 +49,33 @@ fn calculate_answers(intervals: Vec<(Int, Int)>) -> (Int, Int) {
     (part1, part2)
 }
 
-fn find_n_digit_repeats(
+fn find_n_digit_repeats_in_interval(
     target_digit_count: u32,
-    num_repetitions: u32,
+    repetitions: u32,
     first_sequence_seed: Int,
     (lower_bound, upper_bound): (Int, Int),
-    first_iteration: bool,
+    is_first_iteration: bool,
 ) -> Int {
     let mut invalid_id_sum = 0;
 
-    let sequence_digit_count = target_digit_count / num_repetitions;
+    let sequence_digit_count = target_digit_count / repetitions;
     let sequence_max = power_of_ten(sequence_digit_count);
     let potential_duplicate_factor = get_duplicate_factor(sequence_digit_count);
 
     let mut sequence = first_sequence_seed / power_of_ten(target_digit_count - sequence_digit_count);
-    if repeat_num(sequence, num_repetitions) < lower_bound {
+    if repeat_num(sequence, repetitions) < lower_bound {
         //First repetition was less than LB, increase by 1 so it's greater than LB
         sequence += 1;
     };
-    let mut repeated_sequence = repeat_num(sequence, num_repetitions);
+    let mut repeated_sequence = repeat_num(sequence, repetitions);
     while sequence < sequence_max && repeated_sequence <= upper_bound {
         // If spltting with primes, the only case that can be double counted are multiples of 1, 11, 111... etc.
-        // But we do want these values counted once, so check if this is the first
-        if sequence % potential_duplicate_factor != 0 || first_iteration {
+        // But we do want these values counted once, so check if this is the first iteration
+        if sequence % potential_duplicate_factor != 0 || is_first_iteration {
             invalid_id_sum += repeated_sequence;
         }
         sequence += 1;
-        repeated_sequence = repeat_num(sequence, num_repetitions);
+        repeated_sequence = repeat_num(sequence, repetitions);
     }
     invalid_id_sum
 }
@@ -89,19 +91,19 @@ fn digit_count(x: Int) -> u32 {
 }
 fn power_of_ten(x: u32) -> Int { Int::pow(10, x) }
 fn get_duplicate_factor(num_digits: u32) -> Int { (0..num_digits).map(power_of_ten).sum() }
-fn repeat_num(num: Int, num_times: u32) -> Int {
+fn repeat_num(num: Int, repetitions: u32) -> Int {
     let digits = digit_count(num);
-    (0..num_times)
-        .map(|repetition| num * power_of_ten(digits * repetition))
-        .sum()
+    (0..repetitions).map(|r| num * power_of_ten(digits * r)).sum()
 }
 
 fn read_input<P>(filename: P) -> Result<Vec<(Int, Int)>, Box<dyn Error>>
 where
     P: AsRef<Path>,
 {
-    let input_string = std::fs::read_to_string(filename)?;
-    input_string.split(',').map(read_interval).collect()
+    std::fs::read_to_string(filename)?
+        .split(',')
+        .map(read_interval)
+        .collect()
 }
 fn read_interval(interval_string: &str) -> Result<(Int, Int), Box<dyn Error>> {
     let interval_vec = interval_string
@@ -109,6 +111,7 @@ fn read_interval(interval_string: &str) -> Result<(Int, Int), Box<dyn Error>> {
         .map(str::trim)
         .map(str::parse::<Int>)
         .collect::<Result<Vec<Int>, ParseIntError>>()?;
+
     if interval_vec.len() != 2 || interval_vec[0] > interval_vec[1] {
         Err("Invalid interval format".into())
     } else {
