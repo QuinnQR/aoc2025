@@ -15,35 +15,45 @@ fn main() {
     println!("\tDay 2\nPart 1: {}\nPart 2: {}", part1, part2);
 }
 fn calculate_answers(intervals: Vec<(Int, Int)>) -> (Int, Int) {
+    let primes = vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
     let mut part1 = 0;
+    let mut part2 = 0;
     for (low, high) in intervals {
-        let start_digits = digit_count(low);
-        let mut seed_digits;
-        let mut seed;
+        let mut seed = low;
+        for target_digits in digit_count(low)..digit_count(high) + 1 {
+            let mut is_first_num_splits = true;
+            for &num_repeats in primes.iter().take_while(|x| **x <= target_digits) {
+                if target_digits % (num_repeats) != 0 {
+                    continue;
+                }
+                let sequence_digits = target_digits / num_repeats;
+                let sequence_max = pow10(sequence_digits);
+                let mut sequence = seed / pow10(target_digits - sequence_digits);
 
-        if start_digits % 2 == 0 {
-            seed_digits = start_digits / 2;
-            seed = low / pow10(seed_digits);
-            if repeat_num(seed, seed_digits) < low {
-                seed += 1
-            };
-        } else {
-            seed_digits = start_digits / 2 + 1;
-            seed = pow10(seed_digits - 1);
-        }
-        let mut repeated = repeat_num(seed, seed_digits);
-        let mut upper_power_10 = pow10(seed_digits);
-        while repeated <= high {
-            part1 += repeated;
-            seed += 1;
-            if seed == upper_power_10 {
-                upper_power_10 *= 10;
-                seed_digits += 1;
+                if repeat_num(sequence, num_repeats) < low {
+                    sequence += 1;
+                };
+                let danger_val = get_danger_val(sequence_digits);
+                let mut repeated = repeat_num(sequence, num_repeats);
+                while sequence < sequence_max && repeated <= high {
+                    // If spltting with primes, the only case that can be double counted are multiples of 1, 11, 111... etc.
+                    // But we do want these values counted once, so check if this is the first
+                    if sequence % danger_val != 0 || is_first_num_splits {
+                        part2 += repeated;
+                    }
+                    if num_repeats == 2 {
+                        part1 += repeated;
+                    }
+                    sequence += 1;
+                    repeated = repeat_num(sequence, num_repeats);
+                }
+                is_first_num_splits = false;
             }
-            repeated = repeat_num(seed, seed_digits);
+            seed = pow10(target_digits);
         }
     }
-    (part1, 0)
+
+    (part1, part2)
 }
 fn digit_count(x: Int) -> u32 {
     let mut log = 0;
@@ -58,7 +68,21 @@ fn pow10(x: u32) -> Int {
     let ten: Int = 10;
     ten.pow(x)
 }
-fn repeat_num(num: Int, digits: u32) -> Int { num + pow10(digits) * num }
+fn get_danger_val(num_digits: u32) -> Int {
+    let mut result = 0;
+    for d in 0..num_digits {
+        result += pow10(d);
+    }
+    result
+}
+fn repeat_num(num: Int, num_times: u32) -> Int {
+    let digits = digit_count(num);
+    let mut repeated = 0;
+    for i in 0..num_times {
+        repeated += num * pow10(digits * i);
+    }
+    repeated
+}
 
 fn read_input<P>(filename: P) -> Result<Vec<(Int, Int)>, Box<dyn Error>>
 where
@@ -115,6 +139,11 @@ mod tests {
         assert_eq!(part1, 1227775554);
     }
     #[test]
+    fn test_example_part2() {
+        let (_part1, part2) = calculate_answers(read_input("test").unwrap());
+        assert_eq!(part2, 4174379265);
+    }
+    #[test]
     fn test_digit_count() {
         assert_eq!(digit_count(10), 2);
         assert_eq!(digit_count(99), 2);
@@ -125,8 +154,9 @@ mod tests {
     }
     #[test]
     fn test_repeat_num() {
-        assert_eq!(repeat_num(100, digit_count(100)), 100100);
-        assert_eq!(repeat_num(1000, digit_count(1000)), 10001000);
-        assert_eq!(repeat_num(1234, digit_count(1234)), 12341234)
+        assert_eq!(repeat_num(100, 2), 100100);
+        assert_eq!(repeat_num(1000, 2), 10001000);
+        assert_eq!(repeat_num(1234, 2), 12341234);
+        assert_eq!(repeat_num(1234, 4), 1234123412341234)
     }
 }
