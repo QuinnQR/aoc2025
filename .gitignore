@@ -1,2 +1,4 @@
 **/target/
 **/input
+shared/Cargo.lock
+**/.vscode/
