@@ -1,10 +1,19 @@
 use std::{error::Error, path::Path};
 type Int = i64;
-fn main() {
+pub fn main() {
     let start = std::time::Instant::now();
-    let (part1, part2) = calculate_answers(read_input("input").unwrap());
+    let input = read_input("input").unwrap();
+    let parsed = start.elapsed();
+    let (part1, part2) = calculate_answers(input);
     let elapsed = start.elapsed();
-    println!("Part 1: {}\nPart 2: {}\nTime: {}", part1, part2, elapsed.as_micros());
+    println!(
+        "\tDay 3 Unsafe\nPart 1: {}\nPart 2: {}\nTime:   {}\nIO:     {}\nCalc:   {}",
+        part1,
+        part2,
+        elapsed.as_micros(),
+        parsed.as_micros(),
+        (elapsed - parsed).as_micros()
+    );
 }
 fn calculate_answers(raw_data: Vec<u8>) -> (Int, Int) {
     raw_data

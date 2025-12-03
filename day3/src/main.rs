@@ -2,6 +2,7 @@ use shared::get_lines_from_file;
 use std::{error::Error, path::Path};
 type Int = i64;
 fn main() {
+    let start = std::time::Instant::now();
     let line_iterator = match read_input("input") {
         Err(error) => {
             println!("Error occured reading day 3 input: {}", error.to_string());
@@ -10,7 +11,13 @@ fn main() {
         Ok(iterator) => iterator,
     };
     let (part1, part2) = calculate_answers(line_iterator);
-    println!("\tDay 3\nPart 1: {}\nPart 2: {}", part1, part2,);
+    let elapsed = start.elapsed();
+    println!(
+        "\tDay 3\nPart 1: {}\nPart 2: {}\nTime:   {}",
+        part1,
+        part2,
+        elapsed.as_micros()
+    );
 }
 fn calculate_answers(line_iterator: Box<dyn Iterator<Item = String>>) -> (Int, Int) {
     line_iterator
