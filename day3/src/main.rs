@@ -10,40 +10,48 @@ fn main() {
         Ok(iterator) => iterator,
     };
     let (part1, part2) = calculate_answers(line_iterator);
-    println!("\tDay 3\nPart 1:  {}\nPart 2:  {}", part1, part2,);
+    println!("\tDay 3\nPart 1: {}\nPart 2: {}", part1, part2,);
 }
 fn calculate_answers(line_iterator: Box<dyn Iterator<Item = String>>) -> (Int, Int) {
-    let mut part1: Int = 0;
-    let mut part2: Int = 0;
+    line_iterator
+        .map(get_line_result)
+        .reduce(|lhs, rhs| (lhs.0 + rhs.0, lhs.1 + rhs.1))
+        .unwrap()
+}
 
-    for line in line_iterator {
-        let mut part_two_digits: [Int; 12] = [0; 12];
-        let mut part_one_digits: [Int; 2] = [0; 2];
-        // Stores the digit of the best
-        for (next_digit_idx, next_digit_char) in line.chars().enumerate() {
-            let next_digit_value = next_digit_char as Int - '0' as Int;
-            // If we're close to the end, don't replace early digits, start from this idx:
-            let start_index_for_replace = 11 - (line.len() - next_digit_idx - 1).min(11);
-            for index in start_index_for_replace..12 {
-                if next_digit_value > part_two_digits[index] {
-                    part_two_digits[index] = next_digit_value;
-                    part_two_digits[(index + 1)..12].fill(0);
-                    break;
-                }
-            }
+fn get_line_result(line: String) -> (Int, Int) {
+    let mut part_one_digits: [Int; 2] = [0; 2];
+    let mut part_two_digits: [Int; 12] = [0; 12];
+    // Stores the digit of the best
+    for (next_digit_idx, next_digit_char) in line.chars().enumerate() {
+        let next_digit_value = next_digit_char as Int - '0' as Int;
+        // Part 1:
+        if next_digit_value > part_one_digits[0] && next_digit_idx != line.len() - 1 {
             // If at the end of a line, don't replace the first digit for part 1.
-            if next_digit_value > part_one_digits[0] && next_digit_idx != line.len() - 1 {
-                part_one_digits[0] = next_digit_value;
-                part_one_digits[1] = 0;
-            } else if next_digit_value > part_one_digits[1] {
-                part_one_digits[1] = next_digit_value;
+            part_one_digits[0] = next_digit_value;
+            part_one_digits[1] = 0;
+        } else if next_digit_value > part_one_digits[1] {
+            part_one_digits[1] = next_digit_value;
+        }
+
+        // Part 2:
+        // If we're close to the end of the line, don't replace early digits (as there aren't
+        // enough digits left to fill the number) To ensure this, only replace digits after this index:
+        let first_replacable_index = 11 - (line.len() - next_digit_idx - 1).min(11);
+        for index in first_replacable_index..12 {
+            if next_digit_value > part_two_digits[index] {
+                part_two_digits[index] = next_digit_value;
+                // Inserting a number here invalidates the less significant digits, set them to zero
+                part_two_digits[(index + 1)..12].fill(0);
+                break;
             }
         }
-        // Convert digit arrays into an integer
-        part1 += part_one_digits.into_iter().reduce(|lhs, rhs| lhs * 10 + rhs).unwrap();
-        part2 += part_two_digits.into_iter().reduce(|lhs, rhs| lhs * 10 + rhs).unwrap();
     }
-    (part1, part2)
+    // Convert digit arrays into integer tuple and return
+    (
+        part_one_digits.into_iter().reduce(|lhs, rhs| lhs * 10 + rhs).unwrap(),
+        part_two_digits.into_iter().reduce(|lhs, rhs| lhs * 10 + rhs).unwrap(),
+    )
 }
 
 fn read_input<P>(filename: P) -> Result<Box<dyn Iterator<Item = String>>, Box<dyn Error>>
