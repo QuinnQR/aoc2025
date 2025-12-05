@@ -5,15 +5,15 @@ use std::io::{BufReader, Lines};
 use std::num::ParseIntError;
 
 fn main() {
-    let (intervals, ingerdients) = match read_input("input") {
+    let (intervals, ingredients) = match read_input("input") {
         Err(error) => {
             println!("Error occured reading day 5 input: {}", error.to_string());
             return;
         }
-        Ok(iterator) => iterator,
+        Ok(input_data) => input_data,
     };
-    let (part1, part2) = calculate_answers(intervals, ingerdients);
-    println!("\tDay 3\nPart 1: {}\nPart 2: {}", part1, part2);
+    let (part1, part2) = calculate_answers(intervals, ingredients);
+    println!("\tDay 5\nPart 1: {}\nPart 2: {}", part1, part2);
 }
 
 fn calculate_answers(intervals: Vec<(i64, i64)>, ingredients: Vec<i64>) -> (i64, i64) {
@@ -38,9 +38,11 @@ fn merge_all_intervals(intervals: Vec<(i64, i64)>) -> Vec<(i64, i64)> {
         std::mem::swap(&mut new_intervals, &mut old_intervals);
         new_intervals.clear();
         for old_interval in old_intervals.iter() {
-            if (intervals_overlap(interval, *old_interval)) {
+            if intervals_overlap(interval, *old_interval) {
+                // Intervals overlap, merge them and don't push yet.
                 interval = merge_two_intervals(interval, *old_interval)
             } else {
+                // Intervals don't overlap, so leave old_interval unmodified
                 new_intervals.push(*old_interval);
             }
         }
@@ -69,13 +71,14 @@ where
     P: AsRef<std::path::Path>,
 {
     let mut line_iterator = shared::get_lines_from_file(filename)?;
-    let mut_ref: &mut Lines<BufReader<File>> = &mut line_iterator;
-    let intervals: Vec<(i64, i64)> = mut_ref
+    // Take a mut_ref so take_while can be used twice
+    let line_iterator_mutref: &mut Lines<BufReader<File>> = &mut line_iterator;
+    let intervals: Vec<(i64, i64)> = line_iterator_mutref
         .take_while(|x| x.is_ok() && x.as_ref().unwrap().len() > 0)
         .map(Result::unwrap)
         .map(parse_interval)
         .collect::<Result<Vec<(i64, i64)>, Box<dyn Error>>>()?;
-    let ingredients = mut_ref
+    let ingredients = line_iterator_mutref
         .take_while(|x| x.as_ref().is_ok() && x.as_ref().unwrap().len() > 0)
         .map(Result::unwrap)
         .map(|x| x.as_str().parse())
@@ -84,14 +87,15 @@ where
 }
 
 fn parse_interval(interval_string: String) -> Result<(i64, i64), Box<dyn Error>> {
-    let x = interval_string
+    let interval_vec = interval_string
         .split('-')
         .map(str::parse)
         .collect::<Result<Vec<i64>, ParseIntError>>()?;
-    if x.len() != 2 {
+    if interval_vec.len() != 2 {
         return Err("Invalid interval format in input file".into());
     }
-    Ok((x[0], x[1]))
+    // Convert vec to tuple
+    Ok((interval_vec[0], interval_vec[1]))
 }
 
 #[cfg(test)]
