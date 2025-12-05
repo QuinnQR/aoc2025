@@ -30,9 +30,9 @@ fn remove_rolls(layout: Vec<Vec<bool>>) -> (Vec<Vec<bool>>, i32) {
     for row in 1..(layout.len() - 1) {
         for col in 1..(layout[row].len() - 1) {
             if layout[row][col] {
-                let surroundings = layout[row - 1][col - 1..col + 2]
+                let surroundings = layout[row][col - 1..col + 2]
                     .iter()
-                    .chain(layout[row][col - 1..col + 2].iter())
+                    .chain(layout[row - 1][col - 1..col + 2].iter())
                     .chain(layout[row + 1][col - 1..col + 2].iter())
                     .filter(|&&x| x)
                     .count();
