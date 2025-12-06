@@ -1,3 +1,5 @@
+use std::str::Chars;
+
 fn main() {
     let (operand_lines, operators, problem_ranges) = match parse_input("input") {
         Err(error) => {
@@ -10,7 +12,7 @@ fn main() {
     println!("\tDay 6\nPart 1: {}\nPart 2: {}", part1, part2);
 }
 fn calculate_answers(
-    operand_lines: Vec<String>,
+    operand_lines: Vec<Vec<char>>,
     operators: Vec<char>,
     ranges: Vec<std::ops::Range<usize>>,
 ) -> (i64, i64) {
@@ -38,40 +40,34 @@ fn calculate_answers(
 }
 fn get_part_one_operands<'a>(
     range: &'a std::ops::Range<usize>,
-    operand_lines: &'a Vec<String>,
+    operand_lines: &'a Vec<Vec<char>>,
 ) -> Box<dyn Iterator<Item = i64> + 'a> {
+    // Need String to stay alive long enough to use &str
     Box::new(
         operand_lines
             .iter()
-            .map(|x| std::str::from_utf8(&x.as_bytes()[range.clone()]).unwrap().trim())
-            .map(str::parse::<i64>)
-            .map(|x| x.unwrap_or(0)),
+            .map(|x| x[range.clone()].into_iter().collect::<String>())
+            .map(parse_operand_string),
     )
 }
-fn get_part_two_operands(range: &std::ops::Range<usize>, operand_lines: &Vec<String>) -> Box<dyn Iterator<Item = i64>> {
+fn get_part_two_operands(
+    range: &std::ops::Range<usize>,
+    operand_lines: &Vec<Vec<char>>,
+) -> Box<dyn Iterator<Item = i64>> {
     let mut operands = Vec::new();
     // Unlikely to be more than this, might be less.
     operands.reserve(4);
     for idx in range.clone() {
-        operands.push(
-            std::str::from_utf8(
-                operand_lines
-                    .iter()
-                    .map(|x| x.as_bytes()[idx])
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .unwrap()
-            .trim()
-            .parse::<i64>()
-            .unwrap_or(0),
-        );
+        operands.push(parse_operand_string(
+            operand_lines.iter().map(|x| x[idx]).collect::<String>(),
+        ));
     }
     Box::new(operands.into_iter())
 }
+fn parse_operand_string(operand_string: String) -> i64 { operand_string.as_str().trim().parse::<i64>().unwrap_or(0) }
 fn parse_input<P>(
     filename: P,
-) -> Result<(Vec<String>, Vec<char>, Vec<std::ops::Range<usize>>), Box<dyn std::error::Error>>
+) -> Result<(Vec<Vec<char>>, Vec<char>, Vec<std::ops::Range<usize>>), Box<dyn std::error::Error>>
 where
     P: AsRef<std::path::Path>,
 {
@@ -84,8 +80,8 @@ where
         .then(|| ())
         .ok_or("Input lines are not matching length")?; // Make sure all lines are the same length
     let (problem_regions, operators) = parse_operator_line(last_line);
-    let owned_line_vec = line_vec.into_iter().map(String::from).collect();
-    Ok((owned_line_vec, operators, problem_regions))
+    let char_line_vec = line_vec.into_iter().map(str::chars).map(Chars::collect).collect();
+    Ok((char_line_vec, operators, problem_regions))
 }
 fn parse_operator_line(operator_line: &str) -> (Vec<std::ops::Range<usize>>, Vec<char>) {
     // Assumes the line is non empty
@@ -111,7 +107,14 @@ mod tests {
     fn test_parse() {
         let (lines, operators, regions) = parse_input("test").expect("Input file should be at './input'");
         assert_eq!(operators, vec!['*', '+', '*', '+']);
-        assert_eq!(lines, vec!["123 328  51 64 ", " 45 64  387 23 ", "  6 98  215 314"]);
+        assert_eq!(
+            lines,
+            vec![
+                "123 328  51 64 ".chars().collect::<Vec<_>>(),
+                " 45 64  387 23 ".chars().collect::<Vec<_>>(),
+                "  6 98  215 314".chars().collect::<Vec<_>>()
+            ]
+        );
         assert_eq!(regions, vec![0..3, 4..7, 8..11, 12..15]);
     }
     #[test]
