@@ -1,107 +1,126 @@
-use std::num::ParseIntError;
-
 fn main() {
-    let (operands, operators) = match parse_input("input") {
+    let (lines, operators, ranges) = match parse_input("input") {
         Err(error) => {
             println!("Error occured reading day 5 input: {}", error.to_string());
             return;
         }
         Ok(input_data) => input_data,
     };
-    let (part1, part2) = calculate_answers(transpose(operands).unwrap(), operators);
+    let (part1, part2) = calculate_answers(lines, operators, ranges);
     println!("\tDay 6\nPart 1: {}\nPart 2: {}", part1, part2);
 }
-fn calculate_answers(operands: Vec<Vec<i64>>, operators: Vec<char>) -> (i64, i64) {
+fn calculate_answers(
+    operand_lines: Vec<String>,
+    operators: Vec<char>,
+    ranges: Vec<std::ops::Range<usize>>,
+) -> (i64, i64) {
     let mut part1 = 0;
-    for (operand_vec, operator) in std::iter::zip(operands.iter(), operators.iter()) {
-        match operator {
-            '*' => part1 += operand_vec.iter().fold(1_i64, |lhs, rhs| lhs * rhs),
-            '+' => part1 += operand_vec.iter().fold(0_i64, |lhs, rhs| lhs + rhs),
-            _ => (),
-        }
+    let mut part2 = 0;
+    // Part 1
+    for (operator, range) in std::iter::zip(operators.iter(), ranges.iter()) {
+        let part_one_operands = get_part_one_operands(range, &operand_lines);
+        let part_two_operands = get_part_two_operands(range, &operand_lines);
+        let part_one_answer = match operator {
+            '+' => part_one_operands.fold(0_i64, |lhs, rhs| lhs + rhs),
+            '*' => part_one_operands.fold(1_i64, |lhs, rhs| lhs * rhs),
+            _ => 0,
+        };
+        let part_two_answer = match operator {
+            '+' => part_two_operands.into_iter().fold(0_i64, |lhs, rhs| lhs + rhs),
+            '*' => part_two_operands.into_iter().fold(1_i64, |lhs, rhs| lhs * rhs),
+            _ => 0,
+        };
+        part2 += part_two_answer;
+        part1 += part_one_answer;
     }
-    (part1, 0)
+    // Part 2
+    (part1, part2)
 }
-
-fn parse_input<P>(filename: P) -> Result<(Vec<Vec<i64>>, Vec<char>), Box<dyn std::error::Error>>
+fn get_part_one_operands<'a>(
+    range: &'a std::ops::Range<usize>,
+    operand_lines: &'a Vec<String>,
+) -> Box<dyn Iterator<Item = i64> + 'a> {
+    let problem_operand_iter = operand_lines
+        .iter()
+        .map(|x| std::str::from_utf8(&x.as_bytes()[range.clone()]).unwrap().trim())
+        .map(str::parse::<i64>)
+        .map(|x| x.unwrap_or(0));
+    Box::new(problem_operand_iter)
+}
+fn get_part_two_operands(range: &std::ops::Range<usize>, operand_lines: &Vec<String>) -> Box<dyn Iterator<Item = i64>> {
+    let mut operands = Vec::new();
+    for idx in range.clone() {
+        operands.push(
+            std::str::from_utf8(
+                operand_lines
+                    .iter()
+                    .map(|x| x.as_bytes()[idx])
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap()
+            .trim()
+            .parse::<i64>()
+            .unwrap(),
+        );
+    }
+    Box::new(operands.into_iter())
+}
+fn parse_input<P>(
+    filename: P,
+) -> Result<(Vec<String>, Vec<char>, Vec<std::ops::Range<usize>>), Box<dyn std::error::Error>>
 where
     P: AsRef<std::path::Path>,
 {
-    let data = std::fs::read_to_string(filename)?;
-    let mut lines = data.trim().lines();
-    let mut_iterator = &mut lines;
-    let operators = mut_iterator
-        .rev()
-        .take(1)
-        .next()
-        .expect("File should not be empty after .trim() is called")
-        .split(" ")
-        .filter(|string| string.len() > 0)
-        .map(|x| x.chars().next().unwrap())
-        .collect::<Vec<char>>();
-    let operands = mut_iterator
-        .map(|line| {
-            line.split(' ')
-                .filter(|x| x.len() > 0)
-                .map(str::parse)
-                .collect::<Result<Vec<_>, ParseIntError>>()
-        })
-        .collect::<Result<Vec<_>, ParseIntError>>()?;
-    Ok((operands, operators))
-}
-fn transpose<T>(md_vector: Vec<Vec<T>>) -> Result<Vec<Vec<T>>, Box<dyn std::error::Error>>
-where
-    T: Copy,
-{
-    let mut transposed_vector: Vec<Vec<T>> = vec![];
-    transposed_vector.resize(md_vector[0].len(), Vec::<T>::new());
-    if md_vector.iter().any(|col| col.len() != md_vector[0].len()) {
-        return Err("Cannot transpose jagged array".into())
-    };
-    md_vector
+    let file_data = std::fs::read_to_string(filename)?;
+    let mut lines = file_data.lines().filter(|x| x.len() > 0).collect::<Vec<&str>>();
+    let last_line = lines.pop().ok_or("Input file should not be empty")?;
+    lines
         .iter()
-        .map(|x| x.iter())
-        .fold(&mut transposed_vector, |vectors, iterator| {
-            std::iter::zip(vectors.iter_mut(), iterator)
-                .map(|(vec, val)| vec.push(*val))
-                .for_each(drop);
-            vectors
-        });
-    Ok(transposed_vector)
+        .all(|line| line.len() == last_line.len())
+        .then(|| ())
+        .ok_or("Input lines are not matching length")?;
+    let (regions, operators) = parse_operator_line(last_line);
+    let owned_lines = lines.into_iter().map(String::from).collect();
+    Ok((owned_lines, operators, regions))
 }
+fn parse_operator_line(op_line: &str) -> (Vec<std::ops::Range<usize>>, Vec<char>) {
+    // Assumes the line is non empty
+    let mut regions = Vec::new();
+    let mut operators = Vec::new();
+    let mut last_idx = 0;
+    operators.push(op_line.chars().next().unwrap());
+    for (idx, ch) in op_line.chars().enumerate().skip(1) {
+        if ch != ' ' {
+            operators.push(ch);
+            regions.push(last_idx..(idx - 1));
+            last_idx = idx;
+        };
+    }
+    regions.push(last_idx..op_line.len());
+    (regions, operators)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn test_parse() {
-        let (operands, operators) = parse_input("test").expect("Test should be stored in the file ./test");
+        let (lines, operators, regions) = parse_input("test").expect("Input file should be at './input'");
         assert_eq!(operators, vec!['*', '+', '*', '+']);
-        assert_eq!(
-            operands,
-            vec![vec![123, 328, 51, 64], vec![45, 64, 387, 23], vec![6, 98, 215, 314]]
-        );
-    }
-    #[test]
-    fn test_transpose() {
-        let (operands, _operators) = parse_input("test").expect("Test should be stored in the file ./test");
-        assert_eq!(
-            transpose(operands).expect("Test operands should form a non-jagged Vec"),
-            vec![
-                vec![123, 45, 6],
-                vec![328, 64, 98],
-                vec![51, 387, 215],
-                vec![64, 23, 314]
-            ]
-        );
-        match transpose(vec![vec![123, 456, 789], vec![123, 456].to_vec()]) {
-            Err(_error) => (),
-            Ok(_some_val) => panic!("Transpose with jagged array should cause an error"),
-        };
+        assert_eq!(lines, vec!["123 328  51 64 ", " 45 64  387 23 ", "  6 98  215 314"]);
+        assert_eq!(regions, vec![0..3, 4..7, 8..11, 12..15]);
     }
     #[test]
     fn test_part_one() {
-        let (operands, operators) = parse_input("test").expect("Test should be stored in the file ./test");
-        let (part1, _part2) = calculate_answers(transpose(operands).expect("input should not be jagged"), operators);
+        let (lines, operators, regions) = parse_input("test").expect("Input file should be at './input'");
+        let (part1, _part2) = calculate_answers(lines, operators, regions);
         assert_eq!(part1, 4277556);
+    }
+    #[test]
+    fn test_part_two() {
+        let (lines, operators, regions) = parse_input("test").expect("Input file should be at './input'");
+        let (_part1, part2) = calculate_answers(lines, operators, regions);
+        assert_eq!(part2, 3263827);
     }
 }
