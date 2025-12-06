@@ -1,12 +1,12 @@
 fn main() {
-    let (lines, operators, ranges) = match parse_input("input") {
+    let (operand_lines, operators, problem_ranges) = match parse_input("input") {
         Err(error) => {
             println!("Error occured reading day 5 input: {}", error.to_string());
             return;
         }
         Ok(input_data) => input_data,
     };
-    let (part1, part2) = calculate_answers(lines, operators, ranges);
+    let (part1, part2) = calculate_answers(operand_lines, operators, problem_ranges);
     println!("\tDay 6\nPart 1: {}\nPart 2: {}", part1, part2);
 }
 fn calculate_answers(
@@ -17,9 +17,9 @@ fn calculate_answers(
     let mut part1 = 0;
     let mut part2 = 0;
     // Part 1
-    for (operator, range) in std::iter::zip(operators.iter(), ranges.iter()) {
-        let part_one_operands = get_part_one_operands(range, &operand_lines);
-        let part_two_operands = get_part_two_operands(range, &operand_lines);
+    for (operator, problem_range) in std::iter::zip(operators.iter(), ranges.iter()) {
+        let part_one_operands = get_part_one_operands(problem_range, &operand_lines);
+        let part_two_operands = get_part_two_operands(problem_range, &operand_lines);
         let part_one_answer = match operator {
             '+' => part_one_operands.fold(0_i64, |lhs, rhs| lhs + rhs),
             '*' => part_one_operands.fold(1_i64, |lhs, rhs| lhs * rhs),
@@ -40,15 +40,18 @@ fn get_part_one_operands<'a>(
     range: &'a std::ops::Range<usize>,
     operand_lines: &'a Vec<String>,
 ) -> Box<dyn Iterator<Item = i64> + 'a> {
-    let problem_operand_iter = operand_lines
-        .iter()
-        .map(|x| std::str::from_utf8(&x.as_bytes()[range.clone()]).unwrap().trim())
-        .map(str::parse::<i64>)
-        .map(|x| x.unwrap_or(0));
-    Box::new(problem_operand_iter)
+    Box::new(
+        operand_lines
+            .iter()
+            .map(|x| std::str::from_utf8(&x.as_bytes()[range.clone()]).unwrap().trim())
+            .map(str::parse::<i64>)
+            .map(|x| x.unwrap_or(0)),
+    )
 }
 fn get_part_two_operands(range: &std::ops::Range<usize>, operand_lines: &Vec<String>) -> Box<dyn Iterator<Item = i64>> {
     let mut operands = Vec::new();
+    // Unlikely to be more than this, might be less.
+    operands.reserve(4);
     for idx in range.clone() {
         operands.push(
             std::str::from_utf8(
@@ -61,7 +64,7 @@ fn get_part_two_operands(range: &std::ops::Range<usize>, operand_lines: &Vec<Str
             .unwrap()
             .trim()
             .parse::<i64>()
-            .unwrap(),
+            .unwrap_or(0),
         );
     }
     Box::new(operands.into_iter())
@@ -73,32 +76,32 @@ where
     P: AsRef<std::path::Path>,
 {
     let file_data = std::fs::read_to_string(filename)?;
-    let mut lines = file_data.lines().filter(|x| x.len() > 0).collect::<Vec<&str>>();
-    let last_line = lines.pop().ok_or("Input file should not be empty")?;
-    lines
+    let mut line_vec = file_data.lines().filter(|x| x.len() > 0).collect::<Vec<&str>>();
+    let last_line = line_vec.pop().ok_or("Input file should not be empty")?;
+    line_vec
         .iter()
         .all(|line| line.len() == last_line.len())
         .then(|| ())
-        .ok_or("Input lines are not matching length")?;
-    let (regions, operators) = parse_operator_line(last_line);
-    let owned_lines = lines.into_iter().map(String::from).collect();
-    Ok((owned_lines, operators, regions))
+        .ok_or("Input lines are not matching length")?; // Make sure all lines are the same length
+    let (problem_regions, operators) = parse_operator_line(last_line);
+    let owned_line_vec = line_vec.into_iter().map(String::from).collect();
+    Ok((owned_line_vec, operators, problem_regions))
 }
-fn parse_operator_line(op_line: &str) -> (Vec<std::ops::Range<usize>>, Vec<char>) {
+fn parse_operator_line(operator_line: &str) -> (Vec<std::ops::Range<usize>>, Vec<char>) {
     // Assumes the line is non empty
-    let mut regions = Vec::new();
+    let mut problem_regions = Vec::new();
     let mut operators = Vec::new();
-    let mut last_idx = 0;
-    operators.push(op_line.chars().next().unwrap());
-    for (idx, ch) in op_line.chars().enumerate().skip(1) {
+    let mut last_operator_idx = 0;
+    operators.push(operator_line.chars().next().unwrap());
+    for (idx, ch) in operator_line.chars().enumerate().skip(1) {
         if ch != ' ' {
             operators.push(ch);
-            regions.push(last_idx..(idx - 1));
-            last_idx = idx;
+            problem_regions.push(last_operator_idx..(idx - 1));
+            last_operator_idx = idx;
         };
     }
-    regions.push(last_idx..op_line.len());
-    (regions, operators)
+    problem_regions.push(last_operator_idx..operator_line.len());
+    (problem_regions, operators)
 }
 
 #[cfg(test)]
