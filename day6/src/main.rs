@@ -3,7 +3,7 @@ use std::str::Chars;
 fn main() {
     let (operand_lines, operators, problem_ranges) = match parse_input("input") {
         Err(error) => {
-            println!("Error occured reading day 5 input: {}", error.to_string());
+            println!("Error occured reading day 6 input: {}", error.to_string());
             return;
         }
         Ok(input_data) => input_data,
