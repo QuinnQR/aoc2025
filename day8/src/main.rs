@@ -3,7 +3,7 @@ use std::{cmp::Reverse, collections::BinaryHeap, fmt::Binary, num::ParseIntError
 fn main() {
     let points = match parse_input("input") {
         Err(error) => {
-            println!("Error occured reading day 6 input: {}", error.to_string());
+            println!("Error occured reading day 8 input: {}", error.to_string());
             return;
         }
         Ok(input_data) => input_data,
@@ -14,27 +14,23 @@ fn main() {
 }
 const NO_COMPONENT_IDX: usize = usize::MAX;
 fn calculate_answers(points: Vec<Point>, num_edges_to_wire: usize) -> (i64, i64) {
-    let mut edges = get_edges(&points);
+    let mut edge_heap = get_edges(&points);
     let mut components: Vec<Option<Component>> = Vec::new();
     components.reserve(points.len());
     let mut node_to_component_idx: Vec<usize> = Vec::new();
+    // Wire components for part 1 (returns early, when num_edges_to_wire has been wired)
     node_to_component_idx.resize(points.len(), NO_COMPONENT_IDX);
     add_edges(
-        &mut edges,
+        &mut edge_heap,
         &mut components,
         &mut node_to_component_idx,
         points.len(),
         num_edges_to_wire,
     );
-    let mut part1_component_sizes = components
-        .iter()
-        .filter(|x| x.is_some())
-        .map(|x| x.as_ref().unwrap().nodes.len())
-        .collect::<Vec<_>>();
-    part1_component_sizes.sort();
-    let part1 = part1_component_sizes.into_iter().rev().take(3).fold(1, |x, y| x * y);
+
+    let part1 = get_part_one(&components);
     let (node1_idx, node2_idx) = add_edges(
-        &mut edges,
+        &mut edge_heap,
         &mut components,
         &mut node_to_component_idx,
         points.len(),
@@ -43,20 +39,32 @@ fn calculate_answers(points: Vec<Point>, num_edges_to_wire: usize) -> (i64, i64)
     let part2 = points[node1_idx].0.0 * points[node2_idx].0.0;
     (part1 as i64, part2 as i64)
 }
+fn get_part_one(components: &Vec<Option<Component>>) -> i64 {
+    let mut part1_component_sizes = components
+        .iter()
+        .filter(|x| x.is_some())
+        .map(|x| x.as_ref().unwrap().nodes.len())
+        .collect::<Vec<_>>();
+    part1_component_sizes.sort();
+    part1_component_sizes.into_iter().rev().take(3).fold(1, |x, y| x * y) as i64
+}
 fn add_edges<'a>(
-    // Assumes that part1 finishes before part2 (technically not guaranteed)
     edge_heap: &mut std::collections::BinaryHeap<GraphEdge>,
     components: &mut Vec<Option<Component>>,
     node_to_component_idx: &mut Vec<usize>,
     num_points: usize,
     max_edges: usize,
 ) -> (usize, usize) {
+    // Assumes that part1 finishes before part2 (technically not guaranteed)
+    // The return value are the ids of the final nodes connected, used for part2
+    // Once a component has a size of num_points, the function returns as part 2 is finished.
     let mut edge = edge_heap.pop();
     let mut remaining_edges = max_edges;
     while edge.is_some() {
         let (source_node, dest_node) = edge.unwrap().get_nodes();
         match (node_to_component_idx[source_node], node_to_component_idx[dest_node]) {
             (NO_COMPONENT_IDX, NO_COMPONENT_IDX) => {
+                // Neither node is currently in a component, so make a new one.
                 components.push(Some(Component {
                     nodes: vec![source_node, dest_node],
                 }));
@@ -64,6 +72,7 @@ fn add_edges<'a>(
                 node_to_component_idx[dest_node] = components.len() - 1;
             }
             (NO_COMPONENT_IDX, component_id) => {
+                // One node is in a component, so add the other node to the component as well
                 components[component_id].as_mut().unwrap().nodes.push(source_node);
                 node_to_component_idx[source_node] = component_id;
                 if components[component_id].as_ref().unwrap().nodes.len() == num_points {
@@ -71,6 +80,7 @@ fn add_edges<'a>(
                 }
             }
             (component_id, NO_COMPONENT_IDX) => {
+                // Mirror of above case, same idea
                 components[component_id].as_mut().unwrap().nodes.push(dest_node);
                 node_to_component_idx[dest_node] = component_id;
                 if components[component_id].as_ref().unwrap().nodes.len() == num_points {
@@ -78,6 +88,8 @@ fn add_edges<'a>(
                 }
             }
             (source_id, dest_id) => {
+                // Both nodes are in a component, so merge them and deactivate one (in this case,
+                // deactivate the component that source_id belongs to)
                 if source_id != dest_id {
                     let old_source = components[source_id].take().unwrap();
                     for node in old_source.nodes.iter() {
@@ -95,11 +107,15 @@ fn add_edges<'a>(
             }
         }
         remaining_edges -= 1;
-        if (remaining_edges == 0) {
+        if remaining_edges == 0 {
+            // Used for part 1 to end the iteration early.
+            // as part 1 doesn't use the RV, can return anything here.
             return (0, 0)
         };
         edge = edge_heap.pop();
     }
+    // Shouldn't reach here as either part 1 should finish (remaining edges == 0) or
+    // part 2 should finish (largest component is of size num_points)
     (0, 0)
 }
 fn get_edges(points: &Vec<Point>) -> BinaryHeap<GraphEdge> {
@@ -113,7 +129,9 @@ fn get_edges(points: &Vec<Point>) -> BinaryHeap<GraphEdge> {
             edges.push(GraphEdge::new((*point2 - *point1).norm2_sq(), p1_id, p2_id));
         }
     }
+    // This should be O(n) (instead of O(n log n) for a sort)
     BinaryHeap::from(edges)
+    // In total, though, this function is O(n^2)
 }
 fn parse_input<P>(filename: P) -> Result<Vec<Point>, Box<dyn std::error::Error>>
 where
@@ -128,17 +146,17 @@ where
 fn parse_line(point_line: &str) -> Result<Point, Box<dyn std::error::Error>> {
     let point_vec = point_line
         .split(',')
-        .map(str::parse::<i128>)
+        .map(str::parse::<i64>)
         .collect::<Result<Vec<_>, ParseIntError>>()?;
     if point_vec.len() != 3 {
         return Err("Incorrect point format in input".into())
     }
-    return Ok(Point((point_vec[0], point_vec[1], point_vec[2])));
+    Ok(Point((point_vec[0], point_vec[1], point_vec[2])))
 }
 #[derive(PartialEq, Eq, Clone, Copy)]
-struct Point((i128, i128, i128));
+struct Point((i64, i64, i64));
 impl Point {
-    fn norm2_sq(&self) -> i128 { self.0.0 * self.0.0 + self.0.1 * self.0.1 + self.0.2 * self.0.2 }
+    fn norm2_sq(&self) -> i64 { self.0.0 * self.0.0 + self.0.1 * self.0.1 + self.0.2 * self.0.2 }
 }
 impl std::ops::Sub for Point {
     type Output = Self;
@@ -146,13 +164,13 @@ impl std::ops::Sub for Point {
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct GraphEdge {
-    distance: i128,
+    distance: i64,
     source: usize,
     dest: usize,
 }
 impl GraphEdge {
     fn get_nodes(&self) -> (usize, usize) { (self.source, self.dest) }
-    fn new(dist: i128, src: usize, des: usize) -> Self {
+    fn new(dist: i64, src: usize, des: usize) -> Self {
         Self {
             distance: dist,
             source: src,
@@ -169,11 +187,11 @@ impl PartialOrd for GraphEdge {
 impl Ord for GraphEdge {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering { Reverse(self.distance).cmp(&Reverse(other.distance)) }
 }
-//Tried packing the source and dest more tightly, but it didn't work (maybe needs > 96 bits to store distance squared)
-/*struct GraphEdge(i128);
+//Tried packing the source and dest more tightly, but it didn't work (maybe needs > 96 bits to store distance squared, or perhaps just a bug)
+/*struct GraphEdge(i64);
 impl GraphEdge {
-    fn new(distance: i128, source: usize, dest: usize) -> Self {
-        GraphEdge((distance << 32) + ((source & 0xFF) << 16) as i128 + (dest & 0xFF) as i128)
+    fn new(distance: i64, source: usize, dest: usize) -> Self {
+        GraphEdge((distance << 32) + ((source & 0xFF) << 16) as i64 + (dest & 0xFF) as i64)
     }
     fn get_nodes(&self) -> (usize, usize) {
         (
