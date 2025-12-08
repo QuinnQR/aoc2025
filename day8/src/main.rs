@@ -12,72 +12,83 @@ fn main() {
     let (part1, part2) = calculate_answers(points, 1000);
     println!("\tDay 8\nPart 1: {}\nPart 2: {}", part1, part2);
 }
-fn calculate_answers(points: Vec<Point>, num_edges: usize) -> (i64, i64) {
+const NO_COMPONENT_IDX: usize = usize::MAX;
+fn calculate_answers(points: Vec<Point>, num_edges_to_wire: usize) -> (i64, i64) {
     let edges = get_edges(&points);
     let mut components: Vec<Option<Component>> = Vec::new();
-    let mut node_to_component: Vec<usize> = Vec::new();
-    node_to_component.resize(points.len(), usize::MAX);
-    let mut nodes_remaining = points.len();
-    for edge in edges.iter().take(num_edges) {
-        let (source, dest) = edge.get_nodes();
-        match (node_to_component[source], node_to_component[dest]) {
-            (usize::MAX, usize::MAX) => {
+    let mut node_to_component_idx: Vec<usize> = Vec::new();
+    node_to_component_idx.resize(points.len(), NO_COMPONENT_IDX);
+    add_edges(
+        Box::new(edges.iter().take(num_edges_to_wire)),
+        &mut components,
+        &mut node_to_component_idx,
+        points.len(),
+    );
+    let mut part1_vec = components
+        .iter()
+        .filter(|x| x.is_some())
+        .map(|x| x.as_ref().unwrap().nodes.len())
+        .collect::<Vec<_>>();
+    part1_vec.sort();
+    let part1 = part1_vec.into_iter().rev().take(3).fold(1, |x, y| x * y);
+    let (node1_idx, node2_idx) = add_edges(
+        Box::new(edges.iter().skip(num_edges_to_wire)),
+        &mut components,
+        &mut node_to_component_idx,
+        points.len(),
+    );
+    let part2 = points[node1_idx].0.0 * points[node2_idx].0.0;
+    (part1 as i64, part2 as i64)
+}
+fn add_edges<'a>(
+    edge_iter: Box<dyn Iterator<Item = &GraphEdge> + 'a>,
+    components: &mut Vec<Option<Component>>,
+    node_to_component_idx: &mut Vec<usize>,
+    num_points: usize,
+) -> (usize, usize) {
+    for edge in edge_iter {
+        let (source_node, dest_node) = edge.get_nodes();
+        match (node_to_component_idx[source_node], node_to_component_idx[dest_node]) {
+            (NO_COMPONENT_IDX, NO_COMPONENT_IDX) => {
                 components.push(Some(Component {
-                    nodes: vec![source, dest],
+                    nodes: vec![source_node, dest_node],
                 }));
-                node_to_component[source] = components.len() - 1;
-                node_to_component[dest] = components.len() - 1;
-                nodes_remaining -= 2;
+                node_to_component_idx[source_node] = components.len() - 1;
+                node_to_component_idx[dest_node] = components.len() - 1;
             }
-            (usize::MAX, component_id) => {
-                components[component_id].as_mut().unwrap().nodes.push(source);
-                node_to_component[source] = component_id;
-                nodes_remaining -= 1;
+            (NO_COMPONENT_IDX, component_id) => {
+                components[component_id].as_mut().unwrap().nodes.push(source_node);
+                node_to_component_idx[source_node] = component_id;
+                if components[component_id].as_ref().unwrap().nodes.len() == num_points {
+                    return (source_node, dest_node);
+                }
             }
-            (component_id, usize::MAX) => {
-                components[component_id].as_mut().unwrap().nodes.push(dest);
-                node_to_component[dest] = component_id;
-                nodes_remaining -= 1;
+            (component_id, NO_COMPONENT_IDX) => {
+                components[component_id].as_mut().unwrap().nodes.push(dest_node);
+                node_to_component_idx[dest_node] = component_id;
+                if components[component_id].as_ref().unwrap().nodes.len() == num_points {
+                    return (source_node, dest_node);
+                }
             }
             (source_id, dest_id) => {
                 if source_id != dest_id {
                     let old_source = components[source_id].take().unwrap();
                     for node in old_source.nodes.iter() {
-                        node_to_component[*node] = dest_id;
+                        node_to_component_idx[*node] = dest_id;
                     }
                     components[dest_id]
                         .as_mut()
                         .unwrap()
                         .nodes
                         .extend(old_source.nodes.into_iter());
+                    if components[dest_id].as_ref().unwrap().nodes.len() == num_points {
+                        return (source_node, dest_node);
+                    }
                 }
             }
         }
     }
-    let mut part1_vec = components
-        .into_iter()
-        .filter(|x| x.is_some())
-        .map(|x| x.unwrap().nodes.len())
-        .collect::<Vec<_>>();
-    part1_vec.sort();
-    let part1 = part1_vec.into_iter().rev().take(3).fold(1, |x, y| x * y);
-    let mut part2 = 0;
-    for edge in edges.iter().skip(num_edges) {
-        let (source, dest) = edge.get_nodes();
-        if node_to_component[source] == usize::MAX {
-            node_to_component[source] = 0;
-            nodes_remaining -= 1;
-        }
-        if node_to_component[dest] == usize::MAX {
-            node_to_component[dest] = 0;
-            nodes_remaining -= 1;
-        }
-        if nodes_remaining == 0 {
-            part2 = points[source].0.0 * points[dest].0.0;
-            break;
-        }
-    }
-    (part1 as i64, part2 as i64)
+    (0, 0)
 }
 fn get_edges(points: &Vec<Point>) -> Vec<GraphEdge> {
     let mut edges: Vec<GraphEdge> = Vec::new();
