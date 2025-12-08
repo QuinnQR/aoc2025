@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, collections::BinaryHeap, fmt::Binary, num::ParseIntError};
+use std::{cmp::Reverse, collections::BinaryHeap, num::ParseIntError};
 
 fn main() {
     let points = match parse_input("input") {
@@ -18,25 +18,27 @@ fn calculate_answers(points: Vec<Point>, num_edges_to_wire: usize) -> (i64, i64)
     let mut components: Vec<Option<Component>> = Vec::new();
     components.reserve(points.len());
     let mut node_to_component_idx: Vec<usize> = Vec::new();
-    // Wire components for part 1 (returns early, when num_edges_to_wire has been wired)
     node_to_component_idx.resize(points.len(), NO_COMPONENT_IDX);
-    add_edges(
+
+    // Wire components for part 1 (returns early, when num_edges_to_wire has been wired)
+    add_edges_to_graph(
         &mut edge_heap,
         &mut components,
         &mut node_to_component_idx,
         points.len(),
         num_edges_to_wire,
     );
-
     let part1 = get_part_one(&components);
-    let (node1_idx, node2_idx) = add_edges(
+
+    // Wire components for part 2 (returns when the whole graph is a component, return indices of last 2 points wired)
+    let (last_node1, last_node2) = add_edges_to_graph(
         &mut edge_heap,
         &mut components,
         &mut node_to_component_idx,
         points.len(),
         usize::MAX,
     );
-    let part2 = points[node1_idx].0.0 * points[node2_idx].0.0;
+    let part2 = points[last_node1].0.0 * points[last_node2].0.0;
     (part1 as i64, part2 as i64)
 }
 fn get_part_one(components: &Vec<Option<Component>>) -> i64 {
@@ -48,7 +50,7 @@ fn get_part_one(components: &Vec<Option<Component>>) -> i64 {
     part1_component_sizes.sort();
     part1_component_sizes.into_iter().rev().take(3).fold(1, |x, y| x * y) as i64
 }
-fn add_edges<'a>(
+fn add_edges_to_graph<'a>(
     edge_heap: &mut std::collections::BinaryHeap<GraphEdge>,
     components: &mut Vec<Option<Component>>,
     node_to_component_idx: &mut Vec<usize>,
@@ -166,20 +168,20 @@ impl std::ops::Sub for Point {
 struct GraphEdge {
     distance: i64,
     source: usize,
-    dest: usize,
+    destination: usize,
 }
 impl GraphEdge {
-    fn get_nodes(&self) -> (usize, usize) { (self.source, self.dest) }
-    fn new(dist: i64, src: usize, des: usize) -> Self {
+    fn get_nodes(&self) -> (usize, usize) { (self.source, self.destination) }
+    fn new(edge_distance: i64, edge_source: usize, edge_dest: usize) -> Self {
         Self {
-            distance: dist,
-            source: src,
-            dest: des,
+            distance: edge_distance,
+            source: edge_source,
+            destination: edge_dest,
         }
     }
 }
 impl PartialOrd for GraphEdge {
-    // Technically I think this isn't valid as two non equal GraphEdges might return equal, but it compiles and works for this problem
+    // Technically I think this isn't valid as two non equal GraphEdges could return equal, but it compiles and works for this problem
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(Reverse(self.distance).cmp(&Reverse(other.distance)))
     }
@@ -187,20 +189,7 @@ impl PartialOrd for GraphEdge {
 impl Ord for GraphEdge {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering { Reverse(self.distance).cmp(&Reverse(other.distance)) }
 }
-//Tried packing the source and dest more tightly, but it didn't work (maybe needs > 96 bits to store distance squared, or perhaps just a bug)
-/*struct GraphEdge(i64);
-impl GraphEdge {
-    fn new(distance: i64, source: usize, dest: usize) -> Self {
-        GraphEdge((distance << 32) + ((source & 0xFF) << 16) as i64 + (dest & 0xFF) as i64)
-    }
-    fn get_nodes(&self) -> (usize, usize) {
-        (
-            ((self.0 >> 16) & 0xFF).try_into().unwrap_or(usize::MAX),
-            (self.0 & 0xFF).try_into().unwrap_or(usize::MAX),
-        )
-    }
-}
-    */
+
 struct Component {
     nodes: Vec<usize>,
 }
