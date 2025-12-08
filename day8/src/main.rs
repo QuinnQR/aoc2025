@@ -131,9 +131,8 @@ fn get_edges(points: &Vec<Point>) -> BinaryHeap<GraphEdge> {
             edges.push(GraphEdge::new((*point2 - *point1).norm2_sq(), p1_id, p2_id));
         }
     }
-    // This should be O(n) (instead of O(n log n) for a sort)
+    // This should be O(n^2) (instead of O(n^2 log n^2) for a sort) (where n is the number of nodes)
     BinaryHeap::from(edges)
-    // In total, though, this function is O(n^2)
 }
 fn parse_input<P>(filename: P) -> Result<Vec<Point>, Box<dyn std::error::Error>>
 where
