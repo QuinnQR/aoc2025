@@ -50,7 +50,7 @@ fn get_part_one(components: &Vec<Option<Component>>) -> i64 {
     part1_component_sizes.sort();
     part1_component_sizes.into_iter().rev().take(3).fold(1, |x, y| x * y) as i64
 }
-fn add_edges_to_graph<'a>(
+fn add_edges_to_graph(
     edge_heap: &mut std::collections::BinaryHeap<GraphEdge>,
     components: &mut Vec<Option<Component>>,
     node_to_component_idx: &mut Vec<usize>,
